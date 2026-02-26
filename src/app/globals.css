@@ -1,20 +1,29 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f8fafc; /* Slate-50 */
-  --foreground: #0f172a; /* Slate-900 */
+  --background: #f8f7fc;
+  --foreground: #1f2937;
 }
 
 @theme inline {
-  /* Design tokens */
+  /* M3-inspired design tokens */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
 
-  --color-primary: #4f46e5; /* Indigo-600 */
-  --color-primary-soft: #eef2ff; /* Indigo-50 */
-  --color-card: #ffffff;
-  --color-muted: #e5e7eb; /* Gray-200 */
-  --color-border-subtle: #e2e8f0; /* Slate-200 */
+  --color-primary: #6d56a3;
+  --color-on-primary: #ffffff;
+  --color-primary-container: #f3f0ff;
+  --color-on-primary-container: #21005d;
+  --color-secondary-container: #e8def8;
+  --color-on-secondary-container: #1d192b;
+  --color-surface: #ffffff;
+  --color-surface-container: #f8f7fc;
+  --color-surface-container-high: #f3f0ff;
+  --color-outline-variant: #ddd6ea;
+  --color-card: var(--color-surface);
+  --color-primary-soft: var(--color-primary-container);
+  --color-muted: #e7e0ec;
+  --color-border-subtle: var(--color-outline-variant);
 
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
@@ -24,4 +33,83 @@ body {
   min-height: 100vh;
   background-color: var(--background);
   color: var(--foreground);
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+@layer components {
+  .app-main {
+    @apply space-y-5 pb-6;
+  }
+
+  .app-title {
+    @apply text-3xl font-bold text-[#1f2937];
+  }
+
+  .app-header-panel {
+    @apply rounded-[2rem] bg-[#f3f0ff] p-4;
+  }
+
+  .app-back-btn {
+    @apply inline-flex h-10 w-10 items-center justify-center rounded-full bg-white text-slate-600 shadow-sm transition hover:bg-slate-50;
+  }
+
+  .app-primary-btn {
+    @apply inline-flex h-11 items-center justify-center rounded-2xl bg-[#6d56a3] px-5 text-sm font-medium text-white transition hover:bg-[#5a4687];
+  }
+
+  .app-success-btn {
+    @apply inline-flex h-11 items-center justify-center rounded-2xl bg-[#2563eb] px-5 text-sm font-medium text-white transition hover:bg-[#1d4ed8];
+  }
+
+  .app-warning-btn {
+    @apply inline-flex h-11 items-center justify-center rounded-2xl bg-[#6b7280] px-5 text-sm font-medium text-white transition hover:bg-[#4b5563];
+  }
+
+  .app-soft-card {
+    @apply rounded-2xl border border-[#ebe5f5] bg-white shadow-sm;
+  }
+
+  .app-login-guard {
+    @apply flex min-h-full flex-col items-center justify-center;
+  }
+
+  .app-login-guard-card {
+    @apply w-full rounded-[2rem] bg-white p-6 text-center shadow-sm ring-1 ring-[#ebe5f5];
+  }
+
+  .app-section-title {
+    @apply px-1 text-lg font-bold text-[#1f2937];
+  }
+
+  .m3-elevated {
+    @apply bg-surface shadow-[0_1px_2px_0_rgba(16,24,40,0.08),0_2px_8px_0_rgba(16,24,40,0.08)];
+  }
+
+  .m3-filled-btn {
+    @apply inline-flex items-center justify-center rounded-full bg-primary px-4 py-2 text-sm font-semibold text-on-primary transition hover:brightness-105;
+  }
+
+  .m3-tonal-btn {
+    @apply inline-flex items-center justify-center rounded-full bg-primary-container px-4 py-2 text-sm font-semibold text-on-primary-container transition hover:brightness-95;
+  }
+
+  .m3-outlined-btn {
+    @apply inline-flex items-center justify-center rounded-full border border-outline-variant bg-surface px-4 py-2 text-sm font-medium text-foreground transition hover:bg-surface-container;
+  }
+
+  .m3-input {
+    @apply h-12 w-full rounded-xl border border-outline-variant bg-surface-container px-4 text-sm text-foreground outline-none ring-primary/30 focus:bg-surface focus:ring-4;
+  }
+
+  .m3-card {
+    @apply rounded-3xl bg-surface-container p-4 ring-1 ring-border-subtle;
+  }
 }
