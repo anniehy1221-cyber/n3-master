@@ -27,9 +27,11 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
       >
-        <div className="flex min-h-screen items-center justify-center bg-background px-4 py-8">
-          <div className="w-full max-w-md rounded-3xl bg-card shadow-lg shadow-slate-200/70 ring-1 ring-border-subtle">
-            {children}
+        <div className="flex min-h-screen items-center justify-center bg-[#f8f7fc] p-4 sm:p-8">
+          <div className="relative w-full max-w-[430px] overflow-hidden bg-white shadow-2xl ring-1 ring-gray-100 sm:rounded-[3rem]">
+            <div className="min-h-screen overflow-y-auto bg-[#fbfbfe] p-6 no-scrollbar sm:h-[850px] sm:min-h-0">
+              {children}
+            </div>
           </div>
         </div>
       </body>
