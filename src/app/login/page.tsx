@@ -16,7 +16,10 @@ export default function LoginPage() {
       setMessage(result.message);
       return;
     }
-    router.push("/");
+    setMessage("登录成功，正在进入首页...");
+    window.setTimeout(() => {
+      router.push("/");
+    }, 2000);
   };
 
   const handleRegister = () => {
@@ -28,7 +31,7 @@ export default function LoginPage() {
     setMessage("注册成功，正在进入首页...");
     window.setTimeout(() => {
       router.push("/");
-    }, 700);
+    }, 2000);
   };
 
   return (

@@ -2,14 +2,13 @@
 
 import { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Bookmark, BookmarkCheck, ChevronLeft } from "lucide-react";
+import { Bookmark, ChevronLeft } from "lucide-react";
 import Link from "next/link";
 import vocabData from "../../../data/vocab.json";
 import {
   addMasteredVocabId,
   getCurrentUsername,
   loadCurrentUserProgress,
-  removeMasteredVocabId,
   toggleFavoriteVocabId,
 } from "../../lib/userProgress";
 
@@ -28,43 +27,38 @@ export default function VocabPage() {
   });
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
-  const [direction, setDirection] = useState<"left" | "right" | "none">(
-    "none",
+  const vocabItems = vocabData as VocabItem[];
+  const unseenItems = useMemo(
+    () =>
+      vocabItems.filter((item) => !masteredIds.includes(item.id)),
+    [masteredIds, vocabItems],
   );
-
   const currentItem: VocabItem | null = useMemo(() => {
-    if (currentIndex >= (vocabData as VocabItem[]).length) return null;
-    return (vocabData as VocabItem[])[currentIndex];
-  }, [currentIndex]);
+    if (currentIndex >= unseenItems.length) return null;
+    return unseenItems[currentIndex];
+  }, [currentIndex, unseenItems]);
 
   const handleKnow = () => {
     if (!currentItem) return;
-    setDirection("right");
     addMasteredVocabId(currentItem.id);
-    setMasteredIds((prev) =>
-      prev.includes(currentItem.id) ? prev : [...prev, currentItem.id],
+    setMasteredIds((prev) => {
+      if (prev.includes(currentItem.id)) return prev;
+      return [...prev, currentItem.id];
+    });
+    setIsFlipped(false);
+    setCurrentIndex((prev) =>
+      Math.min(prev, Math.max(unseenItems.length - 2, 0)),
     );
-    setTimeout(() => {
-      setIsFlipped(false);
-      setCurrentIndex((prev) =>
-        Math.min(prev + 1, (vocabData as VocabItem[]).length),
-      );
-      setDirection("none");
-    }, 200);
   };
 
-  const handleDontKnow = () => {
-    if (!currentItem) return;
-    setDirection("left");
-    removeMasteredVocabId(currentItem.id);
-    setMasteredIds((prev) => prev.filter((id) => id !== currentItem.id));
-    setTimeout(() => {
-      setIsFlipped(false);
-      setCurrentIndex((prev) =>
-        Math.min(prev + 1, (vocabData as VocabItem[]).length),
-      );
-      setDirection("none");
-    }, 200);
+  const handlePrevious = () => {
+    setIsFlipped(false);
+    setCurrentIndex((prev) => Math.max(prev - 1, 0));
+  };
+
+  const handleNext = () => {
+    setIsFlipped(false);
+    setCurrentIndex((prev) => Math.min(prev + 1, Math.max(unseenItems.length - 1, 0)));
   };
 
   const toggleFavorite = () => {
@@ -91,7 +85,6 @@ export default function VocabPage() {
   }
 
   const masteredCount = masteredIds.length;
-  const vocabItems = vocabData as VocabItem[];
 
   return (
     <main className="flex h-full flex-col">
@@ -107,7 +100,7 @@ export default function VocabPage() {
             <div>
               <h1 className="text-lg font-bold text-[#1f2937]">单词闪卡</h1>
               <p className="text-xs text-slate-500">
-                点击翻面，左右划分“认识 / 不认识”
+                点击翻面查看释义，按顺序学习未认识单词
               </p>
             </div>
           </div>
@@ -135,9 +128,8 @@ export default function VocabPage() {
                 rotate: isFlipped ? 0 : 0,
               }}
               exit={{
-                x: direction === "right" ? 160 : direction === "left" ? -160 : 0,
                 opacity: 0,
-                rotate: direction === "right" ? 12 : direction === "left" ? -12 : 0,
+                rotate: 0,
               }}
               transition={{ duration: 0.2 }}
             >
@@ -150,14 +142,18 @@ export default function VocabPage() {
                       </span>
                       <button
                         type="button"
-                        className="text-gray-300 transition hover:text-[#6d56a3]"
+                        className={`transition ${
+                          favoriteIds.includes(currentItem.id)
+                            ? "text-[#22c55e]"
+                            : "text-[#6d56a3] hover:text-[#584191]"
+                        }`}
                         onClick={(e) => {
                           e.stopPropagation();
                           toggleFavorite();
                         }}
                       >
                         {favoriteIds.includes(currentItem.id) ? (
-                          <BookmarkCheck className="h-6 w-6 text-[#6d56a3]" />
+                          <Bookmark className="h-6 w-6 fill-current text-[#22c55e]" />
                         ) : (
                           <Bookmark className="h-6 w-6" />
                         )}
@@ -172,7 +168,7 @@ export default function VocabPage() {
                       </p>
                     </div>
                     <p className="text-center text-xs text-gray-300">
-                      Tip: 向右滑 = 认识，向左滑 = 不认识（用下方按钮模拟）。
+                      Tip: 点击下方按钮切换上一个/下一个，或标记为认识。
                     </p>
                   </>
                 ) : (
@@ -181,7 +177,24 @@ export default function VocabPage() {
                       <span className="rounded-full bg-[#efeaff] px-3 py-1 text-xs font-bold text-[#6d56a3]">
                         背面 · 释义
                       </span>
-                      <span className="text-xs font-bold tracking-widest text-gray-300">TRY!</span>
+                      <button
+                        type="button"
+                        className={`transition ${
+                          favoriteIds.includes(currentItem.id)
+                            ? "text-[#22c55e]"
+                            : "text-[#6d56a3] hover:text-[#584191]"
+                        }`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleFavorite();
+                        }}
+                      >
+                        {favoriteIds.includes(currentItem.id) ? (
+                          <Bookmark className="h-6 w-6 fill-current text-[#22c55e]" />
+                        ) : (
+                          <Bookmark className="h-6 w-6" />
+                        )}
+                      </button>
                     </div>
                     <div className="space-y-6 text-center">
                       <div className="space-y-1">
@@ -226,22 +239,30 @@ export default function VocabPage() {
         </AnimatePresence>
       </section>
 
-      <section className="mt-8 grid grid-cols-2 gap-6 pb-2">
+      <section className="mt-8 grid grid-cols-3 gap-3 pb-2">
         <button
           type="button"
-          onClick={handleDontKnow}
-          disabled={!currentItem}
-          className="inline-flex h-16 items-center justify-center rounded-full border border-[#ffe0e0] bg-[#fff0f0] text-lg font-bold text-[#e05252] shadow-sm transition hover:bg-[#ffe0e0] disabled:cursor-not-allowed disabled:opacity-60"
+          onClick={handlePrevious}
+          disabled={!currentItem || currentIndex === 0}
+          className="inline-flex h-14 items-center justify-center rounded-full border border-slate-200 bg-white text-base font-bold text-slate-600 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          不认识
+          上一个
         </button>
         <button
           type="button"
           onClick={handleKnow}
           disabled={!currentItem}
-          className="app-primary-btn h-16 rounded-full text-lg font-bold shadow-lg shadow-[#6d56a3]/30 disabled:cursor-not-allowed disabled:opacity-60"
+          className="app-primary-btn h-14 rounded-full text-base font-bold shadow-lg shadow-[#6d56a3]/30 disabled:cursor-not-allowed disabled:opacity-60"
         >
           认识
+        </button>
+        <button
+          type="button"
+          onClick={handleNext}
+          disabled={!currentItem || currentIndex >= unseenItems.length - 1}
+          className="inline-flex h-14 items-center justify-center rounded-full border border-slate-200 bg-white text-base font-bold text-slate-600 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          下一个
         </button>
       </section>
     </main>

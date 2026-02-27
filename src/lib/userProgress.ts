@@ -23,12 +23,59 @@ function emptyProgress(): UserProgress {
   };
 }
 
+function normalizeStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is string => typeof item === "string");
+}
+
+function normalizeProgress(raw: unknown): UserProgress {
+  const candidate =
+    raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  return {
+    mastered_vocab_ids: normalizeStringArray(candidate.mastered_vocab_ids),
+    favorite_vocab_ids: normalizeStringArray(candidate.favorite_vocab_ids),
+    mastered_grammar_ids: normalizeStringArray(candidate.mastered_grammar_ids),
+  };
+}
+
 function loadUsers(): UserMap {
   if (typeof window === "undefined") return {};
   try {
     const raw = window.localStorage.getItem(USERS_KEY);
     if (!raw) return {};
-    return JSON.parse(raw) as UserMap;
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const sanitizedUsers: UserMap = {};
+    let changed = false;
+
+    for (const [key, value] of Object.entries(parsed)) {
+      if (!value || typeof value !== "object") {
+        changed = true;
+        continue;
+      }
+      const user = value as Record<string, unknown>;
+      const username = typeof user.username === "string" ? user.username : key;
+      const password = typeof user.password === "string" ? user.password : "";
+      const nextProgress = normalizeProgress(user.progress);
+      sanitizedUsers[key] = {
+        username,
+        password,
+        progress: nextProgress,
+      };
+      const originalProgress = JSON.stringify(user.progress ?? {});
+      const sanitizedProgress = JSON.stringify(nextProgress);
+      if (
+        originalProgress !== sanitizedProgress ||
+        username !== user.username ||
+        password !== user.password
+      ) {
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      saveUsers(sanitizedUsers);
+    }
+    return sanitizedUsers;
   } catch {
     return {};
   }
@@ -97,11 +144,7 @@ export function loadCurrentUserProgress(): UserProgress {
   const users = loadUsers();
   const user = users[username];
   if (!user) return emptyProgress();
-  return {
-    mastered_vocab_ids: user.progress?.mastered_vocab_ids ?? [],
-    favorite_vocab_ids: user.progress?.favorite_vocab_ids ?? [],
-    mastered_grammar_ids: user.progress?.mastered_grammar_ids ?? [],
-  };
+  return normalizeProgress(user.progress);
 }
 
 function updateCurrentUserProgress(updater: (p: UserProgress) => UserProgress) {
@@ -110,11 +153,7 @@ function updateCurrentUserProgress(updater: (p: UserProgress) => UserProgress) {
   const users = loadUsers();
   const user = users[username];
   if (!user) return emptyProgress();
-  const nextProgress = updater({
-    mastered_vocab_ids: user.progress?.mastered_vocab_ids ?? [],
-    favorite_vocab_ids: user.progress?.favorite_vocab_ids ?? [],
-    mastered_grammar_ids: user.progress?.mastered_grammar_ids ?? [],
-  });
+  const nextProgress = updater(normalizeProgress(user.progress));
   users[username] = { ...user, progress: nextProgress };
   saveUsers(users);
   return nextProgress;

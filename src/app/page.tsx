@@ -133,7 +133,7 @@ export default function Home() {
             <p className="text-sm font-medium text-orange-400">模式一</p>
             <h2 className="text-3xl font-bold text-orange-900">单词闪卡</h2>
             <p className="max-w-[75%] text-sm text-orange-700/70">
-              类似 Tinder 滑动，快速区分“认识 / 不认识”。
+              仅展示未认识单词，使用“上一个 / 认识 / 下一个”高效复习。
             </p>
           </div>
           <div className="absolute bottom-6 right-6 flex h-14 w-14 items-center justify-center rounded-full bg-orange-500 text-white shadow-lg shadow-orange-500/30 transition group-hover:scale-105">
