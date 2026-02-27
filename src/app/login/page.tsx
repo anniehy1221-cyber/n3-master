@@ -25,7 +25,10 @@ export default function LoginPage() {
       setMessage(result.message);
       return;
     }
-    router.push("/");
+    setMessage("注册成功，正在进入首页...");
+    window.setTimeout(() => {
+      router.push("/");
+    }, 700);
   };
 
   return (
@@ -81,7 +84,13 @@ export default function LoginPage() {
       </div>
 
       {message ? (
-        <p className="mt-4 rounded-xl border border-[#ffe0e0] bg-[#fff0f0] px-3 py-2 text-xs text-[#e05252]">
+        <p
+          className={`mt-4 rounded-xl px-3 py-2 text-xs ${
+            message.includes("成功")
+              ? "border border-[#d8f5df] bg-[#f1fff4] text-[#2a8f4a]"
+              : "border border-[#ffe0e0] bg-[#fff0f0] text-[#e05252]"
+          }`}
+        >
           {message}
         </p>
       ) : null}

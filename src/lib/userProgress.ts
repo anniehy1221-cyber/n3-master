@@ -51,7 +51,8 @@ export function logoutUser() {
 
 export function registerUser(username: string, password: string) {
   const trimmed = username.trim();
-  if (!trimmed || !password.trim()) {
+  const normalizedPassword = password.trim();
+  if (!trimmed || !normalizedPassword) {
     return { ok: false, message: "账号和密码不能为空" as const };
   }
   const users = loadUsers();
@@ -60,7 +61,7 @@ export function registerUser(username: string, password: string) {
   }
   users[trimmed] = {
     username: trimmed,
-    password,
+    password: normalizedPassword,
     progress: emptyProgress(),
   };
   saveUsers(users);
@@ -72,9 +73,16 @@ export function registerUser(username: string, password: string) {
 
 export function loginUser(username: string, password: string) {
   const trimmed = username.trim();
+  const normalizedPassword = password.trim();
+  if (!trimmed || !normalizedPassword) {
+    return { ok: false, message: "账号和密码不能为空" as const };
+  }
   const users = loadUsers();
   const user = users[trimmed];
-  if (!user || user.password !== password) {
+  if (!user) {
+    return { ok: false, message: "账号不存在，请先注册" as const };
+  }
+  if (user.password !== password && user.password !== normalizedPassword) {
     return { ok: false, message: "账号或密码错误" as const };
   }
   if (typeof window !== "undefined") {
