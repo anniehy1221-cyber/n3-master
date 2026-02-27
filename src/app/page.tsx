@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BookOpen, LogOut, Sparkles, UserRound } from "lucide-react";
 import vocabData from "../../data/vocab.json";
@@ -18,18 +18,38 @@ const TOTAL_VOCAB = (vocabData as VocabFromJson[]).length;
 
 export default function Home() {
   const router = useRouter();
-  const currentUser =
-    typeof window === "undefined" ? null : getCurrentUsername();
-  const [progressData] = useState<UserProgress>(() => {
-    if (typeof window === "undefined") {
-      return {
-        mastered_vocab_ids: [],
-        favorite_vocab_ids: [],
-        mastered_grammar_ids: [],
-      };
-    }
-    return loadCurrentUserProgress();
+  const [currentUser, setCurrentUser] = useState<string | null>(null);
+  const [progressData, setProgressData] = useState<UserProgress>({
+    mastered_vocab_ids: [],
+    favorite_vocab_ids: [],
+    mastered_grammar_ids: [],
   });
+  const [isReady, setIsReady] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const username = await getCurrentUsername();
+      const progress = username ? await loadCurrentUserProgress() : null;
+      if (!mounted) return;
+      setCurrentUser(username);
+      if (progress) {
+        setProgressData(progress);
+      }
+      setIsReady(true);
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  if (!isReady) {
+    return (
+      <main className="app-main flex min-h-full items-center justify-center">
+        <p className="text-sm text-slate-500">加载中...</p>
+      </main>
+    );
+  }
 
   if (!currentUser) {
     return (
@@ -67,8 +87,8 @@ export default function Home() {
           </p>
           <button
             type="button"
-            onClick={() => {
-              logoutUser();
+            onClick={async () => {
+              await logoutUser();
               router.push("/login");
             }}
             className="inline-flex items-center gap-1 text-sm font-medium text-slate-500 transition hover:text-[#6d56a3]"

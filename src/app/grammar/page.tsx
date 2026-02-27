@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   ChevronDown,
@@ -18,14 +18,28 @@ import {
 type GrammarItem = (typeof grammarData)[number];
 
 export default function GrammarPage() {
-  const currentUser =
-    typeof window === "undefined" ? null : getCurrentUsername();
+  const [currentUser, setCurrentUser] = useState<string | null>(null);
+  const [isReady, setIsReady] = useState(false);
   const [query, setQuery] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [masteredIds, setMasteredIds] = useState<string[]>(() => {
-    if (typeof window === "undefined") return [];
-    return loadCurrentUserProgress().mastered_grammar_ids;
-  });
+  const [masteredIds, setMasteredIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const username = await getCurrentUsername();
+      const progress = username ? await loadCurrentUserProgress() : null;
+      if (!mounted) return;
+      setCurrentUser(username);
+      if (progress) {
+        setMasteredIds(progress.mastered_grammar_ids);
+      }
+      setIsReady(true);
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const filteredItems: GrammarItem[] = useMemo(() => {
     if (!query.trim()) return grammarData as GrammarItem[];
@@ -39,10 +53,18 @@ export default function GrammarPage() {
     });
   }, [query]);
 
-  const toggleMastered = (id: string) => {
-    const next = toggleMasteredGrammarId(id);
+  const toggleMastered = async (id: string) => {
+    const next = await toggleMasteredGrammarId(id);
     setMasteredIds(next.mastered_grammar_ids);
   };
+
+  if (!isReady) {
+    return (
+      <main className="app-main flex min-h-full items-center justify-center">
+        <p className="text-sm text-slate-500">加载中...</p>
+      </main>
+    );
+  }
 
   if (!currentUser) {
     return (

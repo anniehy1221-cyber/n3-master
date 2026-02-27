@@ -2,16 +2,24 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { loginUser, registerUser } from "../../lib/userProgress";
+import {
+  loginUser,
+  migrateLocalStorageToCloud,
+  registerUser,
+} from "../../lib/userProgress";
 
 export default function LoginPage() {
   const router = useRouter();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [migrating, setMigrating] = useState(false);
 
-  const handleLogin = () => {
-    const result = loginUser(username, password);
+  const handleLogin = async () => {
+    setSubmitting(true);
+    const result = await loginUser(username, password);
+    setSubmitting(false);
     if (!result.ok) {
       setMessage(result.message);
       return;
@@ -22,8 +30,10 @@ export default function LoginPage() {
     }, 2000);
   };
 
-  const handleRegister = () => {
-    const result = registerUser(username, password);
+  const handleRegister = async () => {
+    setSubmitting(true);
+    const result = await registerUser(username, password);
+    setSubmitting(false);
     if (!result.ok) {
       setMessage(result.message);
       return;
@@ -32,6 +42,17 @@ export default function LoginPage() {
     window.setTimeout(() => {
       router.push("/");
     }, 2000);
+  };
+
+  const handleMigrate = async () => {
+    setMigrating(true);
+    const result = await migrateLocalStorageToCloud();
+    setMigrating(false);
+    if (!result.ok) {
+      setMessage("迁移失败，请稍后重试");
+      return;
+    }
+    setMessage(`迁移成功，已写入 ${result.createdCount} 个本地账号`);
   };
 
   return (
@@ -73,6 +94,7 @@ export default function LoginPage() {
         <button
           type="button"
           onClick={handleLogin}
+          disabled={submitting}
           className="app-primary-btn h-12 w-full rounded-2xl px-6 text-base shadow-md shadow-[#6d56a3]/20"
         >
           登录
@@ -80,11 +102,21 @@ export default function LoginPage() {
         <button
           type="button"
           onClick={handleRegister}
+          disabled={submitting}
           className="inline-flex h-12 w-full items-center justify-center rounded-2xl bg-[#f3f0ff] px-6 text-base font-medium text-[#6d56a3] transition hover:bg-[#e5dfff]"
         >
           注册
         </button>
       </div>
+
+      <button
+        type="button"
+        onClick={handleMigrate}
+        disabled={migrating || submitting}
+        className="mt-3 inline-flex h-10 w-full items-center justify-center rounded-xl border border-[#dcd5ef] bg-white text-sm font-medium text-[#6d56a3] transition hover:bg-[#f6f3ff] disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        {migrating ? "正在迁移本地数据..." : "迁移本地账号与学习进度"}
+      </button>
 
       {message ? (
         <p

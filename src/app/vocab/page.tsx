@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Bookmark, ChevronLeft } from "lucide-react";
 import Link from "next/link";
@@ -15,19 +15,32 @@ import {
 type VocabItem = (typeof vocabData)[number];
 
 export default function VocabPage() {
-  const currentUser =
-    typeof window === "undefined" ? null : getCurrentUsername();
-  const [masteredIds, setMasteredIds] = useState<string[]>(() => {
-    if (typeof window === "undefined") return [];
-    return loadCurrentUserProgress().mastered_vocab_ids;
-  });
-  const [favoriteIds, setFavoriteIds] = useState<string[]>(() => {
-    if (typeof window === "undefined") return [];
-    return loadCurrentUserProgress().favorite_vocab_ids;
-  });
+  const [currentUser, setCurrentUser] = useState<string | null>(null);
+  const [masteredIds, setMasteredIds] = useState<string[]>([]);
+  const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
+  const [isReady, setIsReady] = useState(false);
   const vocabItems = vocabData as VocabItem[];
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const username = await getCurrentUsername();
+      const progress = username ? await loadCurrentUserProgress() : null;
+      if (!mounted) return;
+      setCurrentUser(username);
+      if (progress) {
+        setMasteredIds(progress.mastered_vocab_ids);
+        setFavoriteIds(progress.favorite_vocab_ids);
+      }
+      setIsReady(true);
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   const unseenItems = useMemo(
     () =>
       vocabItems.filter((item) => !masteredIds.includes(item.id)),
@@ -38,13 +51,10 @@ export default function VocabPage() {
     return unseenItems[currentIndex];
   }, [currentIndex, unseenItems]);
 
-  const handleKnow = () => {
+  const handleKnow = async () => {
     if (!currentItem) return;
-    addMasteredVocabId(currentItem.id);
-    setMasteredIds((prev) => {
-      if (prev.includes(currentItem.id)) return prev;
-      return [...prev, currentItem.id];
-    });
+    const next = await addMasteredVocabId(currentItem.id);
+    setMasteredIds(next.mastered_vocab_ids);
     setIsFlipped(false);
     setCurrentIndex((prev) =>
       Math.min(prev, Math.max(unseenItems.length - 2, 0)),
@@ -61,11 +71,19 @@ export default function VocabPage() {
     setCurrentIndex((prev) => Math.min(prev + 1, Math.max(unseenItems.length - 1, 0)));
   };
 
-  const toggleFavorite = () => {
+  const toggleFavorite = async () => {
     if (!currentItem) return;
-    const next = toggleFavoriteVocabId(currentItem.id);
+    const next = await toggleFavoriteVocabId(currentItem.id);
     setFavoriteIds(next.favorite_vocab_ids);
   };
+
+  if (!isReady) {
+    return (
+      <main className="app-main flex min-h-full items-center justify-center">
+        <p className="text-sm text-slate-500">加载中...</p>
+      </main>
+    );
+  }
 
   if (!currentUser) {
     return (

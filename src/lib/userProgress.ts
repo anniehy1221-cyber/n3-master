@@ -1,165 +1,135 @@
-export type UserProgress = {
-  mastered_vocab_ids: string[];
-  favorite_vocab_ids: string[];
-  mastered_grammar_ids: string[];
+import { emptyProgress, normalizeProgress, type UserProgress } from "./progress";
+
+type AuthResult = {
+  ok: boolean;
+  message: string;
 };
 
-type StoredUser = {
-  username: string;
-  password: string;
-  progress: UserProgress;
+type LocalStoredUser = {
+  username?: string;
+  password?: string;
+  progress?: unknown;
 };
-
-type UserMap = Record<string, StoredUser>;
 
 const USERS_KEY = "n3_master_users";
 const CURRENT_USER_KEY = "n3_master_current_user";
 
-function emptyProgress(): UserProgress {
-  return {
-    mastered_vocab_ids: [],
-    favorite_vocab_ids: [],
-    mastered_grammar_ids: [],
-  };
+async function requestJson<T>(url: string, init?: RequestInit): Promise<T | null> {
+  try {
+    const response = await fetch(url, {
+      ...init,
+      headers: {
+        "Content-Type": "application/json",
+        ...(init?.headers ?? {}),
+      },
+      credentials: "include",
+      cache: "no-store",
+    });
+    return (await response.json()) as T;
+  } catch {
+    return null;
+  }
 }
 
-function normalizeStringArray(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  return value.filter((item): item is string => typeof item === "string");
-}
-
-function normalizeProgress(raw: unknown): UserProgress {
-  const candidate =
-    raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
-  return {
-    mastered_vocab_ids: normalizeStringArray(candidate.mastered_vocab_ids),
-    favorite_vocab_ids: normalizeStringArray(candidate.favorite_vocab_ids),
-    mastered_grammar_ids: normalizeStringArray(candidate.mastered_grammar_ids),
-  };
-}
-
-function loadUsers(): UserMap {
+function readLocalUsersForMigration(): Record<string, LocalStoredUser> {
   if (typeof window === "undefined") return {};
   try {
     const raw = window.localStorage.getItem(USERS_KEY);
     if (!raw) return {};
-    const parsed = JSON.parse(raw) as Record<string, unknown>;
-    const sanitizedUsers: UserMap = {};
-    let changed = false;
-
-    for (const [key, value] of Object.entries(parsed)) {
-      if (!value || typeof value !== "object") {
-        changed = true;
-        continue;
-      }
-      const user = value as Record<string, unknown>;
-      const username = typeof user.username === "string" ? user.username : key;
-      const password = typeof user.password === "string" ? user.password : "";
-      const nextProgress = normalizeProgress(user.progress);
-      sanitizedUsers[key] = {
-        username,
-        password,
-        progress: nextProgress,
-      };
-      const originalProgress = JSON.stringify(user.progress ?? {});
-      const sanitizedProgress = JSON.stringify(nextProgress);
-      if (
-        originalProgress !== sanitizedProgress ||
-        username !== user.username ||
-        password !== user.password
-      ) {
-        changed = true;
-      }
-    }
-
-    if (changed) {
-      saveUsers(sanitizedUsers);
-    }
-    return sanitizedUsers;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return {};
+    return parsed as Record<string, LocalStoredUser>;
   } catch {
     return {};
   }
 }
 
-function saveUsers(users: UserMap) {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(USERS_KEY, JSON.stringify(users));
-}
-
-export function getCurrentUsername(): string | null {
-  if (typeof window === "undefined") return null;
-  return window.localStorage.getItem(CURRENT_USER_KEY);
-}
-
-export function logoutUser() {
-  if (typeof window === "undefined") return;
+export async function migrateLocalStorageToCloud(): Promise<{
+  ok: boolean;
+  createdCount: number;
+}> {
+  if (typeof window === "undefined") return { ok: false, createdCount: 0 };
+  const users = readLocalUsersForMigration();
+  const currentUsername = window.localStorage.getItem(CURRENT_USER_KEY);
+  const result = await requestJson<{ ok: boolean; createdCount?: number }>(
+    "/api/migrate/localstorage",
+    {
+      method: "POST",
+      body: JSON.stringify({ users, currentUsername }),
+    },
+  );
+  if (!result?.ok) return { ok: false, createdCount: 0 };
+  window.localStorage.removeItem(USERS_KEY);
   window.localStorage.removeItem(CURRENT_USER_KEY);
+  return { ok: true, createdCount: result.createdCount ?? 0 };
 }
 
-export function registerUser(username: string, password: string) {
-  const trimmed = username.trim();
-  const normalizedPassword = password.trim();
-  if (!trimmed || !normalizedPassword) {
-    return { ok: false, message: "账号和密码不能为空" as const };
-  }
-  const users = loadUsers();
-  if (users[trimmed]) {
-    return { ok: false, message: "账号已存在，请直接登录" as const };
-  }
-  users[trimmed] = {
-    username: trimmed,
-    password: normalizedPassword,
-    progress: emptyProgress(),
-  };
-  saveUsers(users);
-  if (typeof window !== "undefined") {
-    window.localStorage.setItem(CURRENT_USER_KEY, trimmed);
-  }
-  return { ok: true, message: "注册成功" as const };
+export async function getCurrentUsername(): Promise<string | null> {
+  const result = await requestJson<{ ok: boolean; username?: string | null }>(
+    "/api/auth/me",
+  );
+  if (!result?.ok) return null;
+  return result.username ?? null;
 }
 
-export function loginUser(username: string, password: string) {
-  const trimmed = username.trim();
-  const normalizedPassword = password.trim();
-  if (!trimmed || !normalizedPassword) {
-    return { ok: false, message: "账号和密码不能为空" as const };
-  }
-  const users = loadUsers();
-  const user = users[trimmed];
-  if (!user) {
-    return { ok: false, message: "账号不存在，请先注册" as const };
-  }
-  if (user.password !== password && user.password !== normalizedPassword) {
-    return { ok: false, message: "账号或密码错误" as const };
-  }
-  if (typeof window !== "undefined") {
-    window.localStorage.setItem(CURRENT_USER_KEY, trimmed);
-  }
-  return { ok: true, message: "登录成功" as const };
+export async function logoutUser(): Promise<void> {
+  await requestJson<{ ok: boolean }>("/api/auth/logout", { method: "POST" });
 }
 
-export function loadCurrentUserProgress(): UserProgress {
-  const username = getCurrentUsername();
-  if (!username) return emptyProgress();
-  const users = loadUsers();
-  const user = users[username];
-  if (!user) return emptyProgress();
-  return normalizeProgress(user.progress);
+export async function registerUser(
+  username: string,
+  password: string,
+): Promise<AuthResult> {
+  const result = await requestJson<AuthResult>("/api/auth/register", {
+    method: "POST",
+    body: JSON.stringify({ username, password }),
+  });
+  return result ?? { ok: false, message: "注册失败，请稍后重试" };
 }
 
-function updateCurrentUserProgress(updater: (p: UserProgress) => UserProgress) {
-  const username = getCurrentUsername();
-  if (!username) return emptyProgress();
-  const users = loadUsers();
-  const user = users[username];
-  if (!user) return emptyProgress();
-  const nextProgress = updater(normalizeProgress(user.progress));
-  users[username] = { ...user, progress: nextProgress };
-  saveUsers(users);
-  return nextProgress;
+export async function loginUser(
+  username: string,
+  password: string,
+): Promise<AuthResult> {
+  const result = await requestJson<AuthResult>("/api/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ username, password }),
+  });
+  return result ?? { ok: false, message: "登录失败，请稍后重试" };
 }
 
-export function addMasteredVocabId(id: string) {
+export async function loadCurrentUserProgress(): Promise<UserProgress> {
+  const result = await requestJson<{
+    ok: boolean;
+    progress?: unknown;
+  }>("/api/progress");
+  if (!result?.ok) return emptyProgress();
+  return normalizeProgress(result.progress);
+}
+
+async function saveCurrentUserProgress(
+  progress: UserProgress,
+): Promise<UserProgress> {
+  const result = await requestJson<{
+    ok: boolean;
+    progress?: unknown;
+  }>("/api/progress", {
+    method: "PATCH",
+    body: JSON.stringify({ progress }),
+  });
+  if (!result?.ok) return progress;
+  return normalizeProgress(result.progress);
+}
+
+async function updateCurrentUserProgress(
+  updater: (p: UserProgress) => UserProgress,
+): Promise<UserProgress> {
+  const current = await loadCurrentUserProgress();
+  const next = updater(current);
+  return saveCurrentUserProgress(next);
+}
+
+export async function addMasteredVocabId(id: string): Promise<UserProgress> {
   return updateCurrentUserProgress((progress) => ({
     ...progress,
     mastered_vocab_ids: progress.mastered_vocab_ids.includes(id)
@@ -168,14 +138,7 @@ export function addMasteredVocabId(id: string) {
   }));
 }
 
-export function removeMasteredVocabId(id: string) {
-  return updateCurrentUserProgress((progress) => ({
-    ...progress,
-    mastered_vocab_ids: progress.mastered_vocab_ids.filter((x) => x !== id),
-  }));
-}
-
-export function toggleFavoriteVocabId(id: string) {
+export async function toggleFavoriteVocabId(id: string): Promise<UserProgress> {
   return updateCurrentUserProgress((progress) => ({
     ...progress,
     favorite_vocab_ids: progress.favorite_vocab_ids.includes(id)
@@ -184,7 +147,7 @@ export function toggleFavoriteVocabId(id: string) {
   }));
 }
 
-export function toggleMasteredGrammarId(id: string) {
+export async function toggleMasteredGrammarId(id: string): Promise<UserProgress> {
   return updateCurrentUserProgress((progress) => ({
     ...progress,
     mastered_grammar_ids: progress.mastered_grammar_ids.includes(id)
@@ -192,4 +155,6 @@ export function toggleMasteredGrammarId(id: string) {
       : [...progress.mastered_grammar_ids, id],
   }));
 }
+
+export type { UserProgress };
 

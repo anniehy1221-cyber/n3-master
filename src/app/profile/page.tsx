@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { ChevronLeft, UserRound } from "lucide-react";
 import vocabData from "../../../data/vocab.json";
 import grammarData from "../../../data/grammar.json";
@@ -21,8 +22,38 @@ function EmptyState({ text }: { text: string }) {
 }
 
 export default function ProfilePage() {
-  const username =
-    typeof window === "undefined" ? null : getCurrentUsername();
+  const [username, setUsername] = useState<string | null>(null);
+  const [progress, setProgress] = useState({
+    mastered_vocab_ids: [] as string[],
+    favorite_vocab_ids: [] as string[],
+    mastered_grammar_ids: [] as string[],
+  });
+  const [isReady, setIsReady] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const current = await getCurrentUsername();
+      const nextProgress = current ? await loadCurrentUserProgress() : null;
+      if (!mounted) return;
+      setUsername(current);
+      if (nextProgress) {
+        setProgress(nextProgress);
+      }
+      setIsReady(true);
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  if (!isReady) {
+    return (
+      <main className="app-main flex min-h-full items-center justify-center">
+        <p className="text-sm text-slate-500">加载中...</p>
+      </main>
+    );
+  }
 
   if (!username) {
     return (
@@ -41,7 +72,6 @@ export default function ProfilePage() {
     );
   }
 
-  const progress = loadCurrentUserProgress();
   const vocabItems = vocabData as VocabItem[];
   const grammarItems = grammarData as GrammarItem[];
 
